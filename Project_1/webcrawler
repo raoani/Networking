@@ -1,0 +1,182 @@
+#!/usr/bin/env python
+
+
+
+from HTMLParser import HTMLParser
+from socket import socket, AF_INET, SOCK_STREAM
+from urlparse import urlparse
+import numpy as np
+import sys
+import argparse
+a = []
+b = []
+userid = sys.argv[1]
+password = sys.argv[2]
+
+
+class parser(HTMLParser):       #Class defined to handle HTML page and extracting links
+
+    def handle_starttag(self, data, attrs):  #Function defined to extract links from the HTML page
+        if data == 'a':           #Extracting only "a" tag data
+            for (x, y) in attrs:
+                url = urlparse(y)  #extracting urls using url parse
+                newurl = url.path
+                if '/fakebook/' in newurl:   #extracting links only with '/fakebook/' in its URL.
+                    self.everylink.append(newurl)   #extracting and appending the URL to a list from the HTML page.
+
+
+    def links(self, m):                        #function defined to feed the HTML page to the funtion and clearing the list for every page
+        self.everylink = []      #Clears list for every page
+        self.feed(m)
+        return self.everylink	#returns list of all links in that page
+
+    def handle_data(self, data):    #used to extract flags
+        if 'FLAG:' in data :          #if FLAG: in DATA
+            b.append((data[6:]))	#Appened FLAGS to a list
+
+
+
+def postrequest(url):                #funtion defined to LOGIN to FAKEBOOK using RAW POST Request 
+    z = "GET " + url + " HTTP/1.1\r\nConnection: keep-alive\r\nHost:cs5700sp17.ccs.neu.edu\n\n"    # initial get request for Cookie and Session ID
+    s = socket(AF_INET, SOCK_STREAM)     #socket initialization
+    #s.setblocking(0)
+    server = ("cs5700sp17.ccs.neu.edu", 80)
+    s.connect(server)                    #Connect to server
+    s.send(z)                            # Sending the GET request
+    r1 = s.recv(8192)
+    #a1 = handle_data(r1)
+    csrftoken = r1.split('csrftoken=')[1].split(';')[0]     #extracting CSRFTOKEN 
+    session_id = r1.split('sessionid=')[1].split(';')[0]    #extracting SessionID 
+    body = 'csrfmiddlewaretoken={0}&username={1}&password={2}&next=%2fFacebook%2f'.format(csrftoken,userid,password)                #body of post request
+    content_length = len(body)                              #length of body
+    login = ["POST " + "/accounts/login/" + " HTTP/1.1",
+             "Host: cs5700sp17.ccs.neu.edu",
+             "Cookie: csrftoken={0}; sessionid={1}".format(csrftoken, session_id),
+             "Connection: keep-alive",
+             "Content-Type: application/x-www-form-urlencoded",
+             "Content-Length: {0}".format(content_length)]  #POST message syntax
+    space = "\r\n"
+    newlogin = space.join(login)           #joining the list in the POST request format
+    new = newlogin + "\r\n\r\n" + body
+    s = socket(AF_INET, SOCK_STREAM)     #socket initialization
+    #s.setblocking(0)
+    server = ("cs5700sp17.ccs.neu.edu", 80)
+    s.connect(server)
+    s.send(new)
+    r2 = s.recv(8192)
+    #s.setblocking(0)
+    #a2 = handle_data(r2)
+    #print(r2)
+    #newid2 = r2.split('Set-Cookie: sessionid=')[1].split(';')[0] 
+    try :
+        newid2 = r2.split('Set-Cookie: sessionid=')[1].split(';')[0]
+        return csrftoken, newid2
+    except IndexError:
+        print("Incorrect Login, Try Again!!!")
+        return csrftoken, session_id
+
+
+def error_case(m,url,code) :       #function defined to handle all the error cases
+    
+    while code == '500' or not m :          #if status code is 500 enters the WHILE loop
+        s = socket(AF_INET, SOCK_STREAM)
+        #print(code)
+        #s.connect(server)
+        #s.setblocking(0)
+        server = ("cs5700sp17.ccs.neu.edu", 80)   
+        s.connect(server)			#reconnect to the server as the connection closes
+        l1 = 'GET ' + url + ' HTTP/1.1\r\nConnection: keep-alive\r\nHost: cs5700sp17.ccs.neu.edu\r\nCookie: csrftoken={0};sessionid={1}\n\n'.format(
+            csrftoken, newid) #request again
+        s.send(l1)
+        
+#print(l1)
+        m = s.recv(8192)
+        #a1 = handle_data(m)
+
+        code = extract_code(m)     #check for the status code again
+
+    if code == '301' :            #check if the statsus code is 301
+        #print('301')
+        #a2 .split('<a href=')
+        #print(a2)
+        #print(m.split("Location: http://cs5700sp17.ccs.neu.edu")[1].split('Content-Length')[0][0:-2])     
+        return m.split("Location: http://cs5700sp17.ccs.neu.edu")[1].split('Content-Length')[0][0:-2]   #extract the link in data in the LOCATION field
+
+    elif code == '404' or code == '403' :
+        #print('404')
+        return a  #return a empty list(abandon the link)
+
+    elif code == '200' :     #check if status code is 200
+        newparser = parser()  #extract all the links
+        a = newparser.links(m)  
+        return a
+
+    else :
+        newparser = parser()    #if any other status code, extract the links.
+        a = newparser.links(m)
+        return a
+
+def getrequest(s,csrftoken,newid,url) :     #funtion for get request
+    s = socket(AF_INET, SOCK_STREAM)   #defining a socket
+    server = ("cs5700sp17.ccs.neu.edu", 80)
+    s.connect(server)
+    l1 = 'GET ' + url + ' HTTP/1.1\r\nConnection: keep-alive\r\nHost: cs5700sp17.ccs.neu.edu\r\nCookie: csrftoken={0};sessionid={1}\n\n'.format(
+        csrftoken, newid) #get request
+    s.send(l1)
+    m = s.recv(8192)
+    code = extract_code(m)   #extracting the code from data
+    a = error_case(m,url,code)    #checking for error case
+    try :
+	a[0]
+    except IndexError:
+        print("Incorrect login, try again!!")
+    return a
+
+
+
+def combine(a,b):         #function defined to remove duplicates
+    for i in a:              #remove duplicates in b
+        if i not in b:
+            b.append(i)
+    return b
+
+
+
+
+def bfs(newurl,csrftoken,newid,b):     #used for breadthfirst search method
+    visit = []                         #all the visited links
+    while newurl and len(b) < 5:          #check for all the pages and if the length of flaglist is less than 5
+        newpage = newurl.pop(0)
+        if newpage not in visit:               #if the page is not in visited
+            try :
+                a = getrequest(s,csrftoken, newid, newpage)         #send the getrequest
+            except timeout:
+                Print("Timeout, Retry!!!")
+                 
+            newurl = combine(a, newurl)                          #check if the links are in the visited list
+            visit.append(newpage)
+	    print(b)
+            print(len(visit))
+    return visit
+
+def extract_code(newm) :              #extracting the code from the data
+    if newm :
+        #print(m[9:12])
+        #print(a1[0][9:12])
+        code = newm[9:12]             #spliting the status code
+        #print(code)
+        return code
+
+s = socket(AF_INET, SOCK_STREAM)         #socket declaration
+server = ("cs5700sp17.ccs.neu.edu", 80)      #server and port number
+s.connect(server)                         #connecting to server
+url = "/accounts/login/?next=/fakebook/"   #the first url
+csrftoken, newid = postrequest(url)         #postrequest for login
+#print(newid)
+newurl1 = ["/fakebook/"]                     #list containing the links in the page
+visited = bfs(newurl1,csrftoken,newid,b)                                     #calling the Bradthfirstsearch method
+print('\n'.join(b))
+
+s.close()                                    #close the socket
+
+

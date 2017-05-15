@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+
+import socket
+import sys
+import struct
+import subprocess
+import requests
+import sqlite3
+import os
+import zlib
+
+
+
+
+if len(sys.argv) != 5 :
+	sys.exit('invalid arguments')
+
+
+def ip_src () :									# Extracting the source IP
+	ip = subprocess.check_output("ifconfig", shell=True)
+	return ip.split('inet addr:')[1].split()[0]
+
+
+
+def header(r, length) :								#creating header for response
+	head = ''
+	head = 'HTTP/1.0 ' + str(r.status_code) + ' ' + r.reason + '\n'
+	head = head + 'Content-Type: ' + r.headers['content-type'] + '\n'
+	head = head + 'Content-length: ' + str(length) + '\n\n'
+	return head 
+	
+
+def database() :	
+	if os.path.isfile('http_cache_new.db') :
+		conct = sqlite3.connect('http_cache_new.db')
+	else :							#Creating a database
+		conct = sqlite3.connect('http_cache_new.db')
+		conct.execute('''CREATE TABLE HTTP
+		(ID INTEGER PRIMARY KEY AUTOINCREMENT,
+		PATH CHAR(100) NOT NULL,
+		CONTENTS TEXT NOT NULL,
+		COUNT INT NOT NULL);''')
+	return conct
+
+
+def add_data(conct, path, value) :						#adding value to database
+	conct.execute("INSERT INTO HTTP (PATH, CONTENTS, COUNT) VALUES ( ?, ?, ?)",(path, buffer(zlib.compress(value)), 1));
+	conct.commit()
+	return
+
+def remove_db(conct) :								#removing from database
+	conct.execute("DELETE FROM HTTP WHERE COUNT = (SELECT MIN(COUNT) FROM HTTP)");
+	conct.commit()
+	return
+
+def chck_db (conct, path) :							#checking if the content exsists in database
+	cursor=conct.cursor()
+	cursor.execute("SELECT CONTENTS,COUNT FROM HTTP WHERE PATH = ?", (path,))
+	data = cursor.fetchone()
+	if data :
+		newcount = int(data[1]) + 1
+                print(data[1], newcount)
+		cursor.execute("UPDATE HTTP set COUNT = ? WHERE PATH = ?", (newcount, path,))
+		return zlib.decompress(data[0])
+	else :
+		return 0
+
+
+origin = sys.argv[4]
+
+src = ip_src()
+
+port_number = int(sys.argv[2])							
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)				#Socket creation
+s.bind((src, port_number))
+
+conect = database()
+
+
+while True:
+	s.listen(3)								#listening for data
+	conn, addr = s.accept()
+	data = conn.recvfrom(2048)
+	url = data[0].split()[1]					#extracting the URL requested
+	val = os.path.getsize('http_cache_new.db')/float(1048*1048)			#checking sizze of databa
+	data = chck_db(conect, url)						#check if it exisists
+	if data :
+		conn.send(data)
+	else :	
+		r = requests.get('http://' + origin + ':8080' + url)		#requesting from origin server
+		txt = r.text
+		txt = txt.encode('utf-8').strip()
+		head = header(r, len(txt))
+		if val > 9.2 :						#checking if more than 10MB.
+			remove_db(conect)			
+			add_data(conect, url, head + txt)			#adding data
+			conn.send(head + txt)
+		else :
+                        add_data(conect, url, head + txt)                      
+                        conn.send(head + txt)
+

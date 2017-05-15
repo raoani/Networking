@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+
+import requests
+import socket
+import subprocess
+import sys
+import os
+
+
+def ip_src () :									# Extracting the source IP
+	ip = subprocess.check_output("ifconfig", shell=True)
+	return ip.split('inet addr:')[1].split()[0]
+
+def is_num(value):
+	try:
+		float(value)
+		return True
+	except ValueError:
+		return False
+
+src = ip_src()
+
+port_number = 65501							
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)				#Socket creation
+s.bind((src, port_number))
+
+
+while True:
+	s.listen(3)								#listening for data
+	conn, addr = s.accept()
+	data = conn.recvfrom(2048)
+	cmnd = "scamper -c 'ping -c 1' -i " + data[0]		#scammping for value
+	l_1 = subprocess.check_output( cmnd , shell=True)
+	latency = [j for j in l_1.split() if "time" in j]
+	value = latency[0].split("=")[1]
+	if latency :
+		value = latency[0].split("=")[1]
+	else :
+		value = '999'
+	if is_num(value) :
+		print(type(value))	
+		conn.send(value)
+		conn.close()
+	else :
+		conn.send('9999')
+		conn.close()
+

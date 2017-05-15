@@ -1,0 +1,176 @@
+#!/usr/bin/env python
+
+
+import time
+import socket
+import sys
+import struct
+import subprocess
+import requests
+import thread
+import threading
+from math import radians, cos, sin, asin, sqrt
+import Queue as queue
+
+
+if len(sys.argv) != 5 :
+	sys.exit('Invalid arguments')
+
+d_name = sys.argv[4]
+
+
+latency = {}
+ip = {}
+
+
+def ip_src () :									# Extracting the source IP
+	try_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+	try_sock.connect(("www.google.com", 80))
+	ip = try_sock.getsockname()[0]
+	return ip
+
+
+def unpack_dns(data) :								#unpacking the DNS Packet from DIG
+	word  = []
+	recv_ip = data[1]
+	data_packet = data[0]
+	header = struct.unpack('!HHHHHH', data_packet[0:12])
+	q_name = data_packet[12:]
+	len_1 = ord(q_name[0])
+	begin = 0
+	while len_1 != 0 :							#extrcting the domain name
+		end = begin + len_1 + 1
+		word.append(struct.unpack(str(len_1) + 's', q_name[begin+1:end])[0] )
+		begin = end
+		len_1 = ord(q_name[begin])
+	q_name_str = '.'.join(word)
+	q_type = struct.unpack('!H', q_name[end+1:end+3])[0]
+	q_class = struct.unpack('!H', data_packet[end+3:end+5])[0]
+	q_data = q_name[0:end+5]
+	return q_data, header, recv_ip, q_name_str
+
+
+
+
+def pack_dns (q_data, header, ip)	:					#packing the DNS reply
+	p_id = header[0]
+	flags = 0x8180
+	question_count = header[2]
+	answer_count = 1
+	NS_count = 0
+	AR_count = 0
+	new_header = struct.pack('!HHHHHH', p_id, flags, question_count, answer_count, NS_count, AR_count)
+	q_header = new_header + q_data
+	a_name = 0xc00c
+	a_type = 1
+	a_class = 1
+	ttl = 2
+	a_len = 4
+	ip_l = socket.inet_aton(ip)
+	answer = struct.pack('!HHHLH4s' , a_name, a_type, a_class, ttl, a_len, ip_l)
+	return q_header + answer
+
+
+
+def geo_location( recv_ip ) :					#geo loaction based selection
+	url = 'http://api.ipinfodb.com/v3/ip-city/?key=c89b0d51c67f4f8ffe79750e410edc9eee2985781457a30f825be5fa06e9c5ba&ip=' + recv_ip
+	r = requests.get(url)
+	t = r.text
+	s = t.split(';')
+	dest_x = float(s[9])
+	dest_y = float(s[8])
+	coord = {}
+	coord["52.90.80.45"] = [-77.4875, 39.0437]
+	coord["54.183.23.203"] = [-121.895, 37.3394]
+	coord["54.70.111.57"] = [-122.676, 45.5234]
+	coord["52.215.87.82"] = [-6.2671, 53.344]
+	coord["52.28.249.79"] = [8.68417, 50.1155]
+	coord["54.169.10.54"] = [103.85, 1.28967]
+	coord["52.62.198.57"] = [151.207, -33.8679]
+	coord["52.192.64.163"] = [139.692, 35.6895]
+	coord["54.233.152.60"] = [-46.6361, -23.5475]
+
+
+	def haversine(dest_x, dest_y, src_x, src_y):
+		dest_x, dest_y, src_x, src_y = map(radians, [dest_x, dest_y, src_x, src_y])
+		longitute = src_x - dest_x
+		latitude = src_y - dest_y	
+		per_mile = 2 * asin(sqrt(sin(latitude/2)**2 + cos(dest_y) * cos(src_y) * sin(longitute/2)**2))
+		m = 6367 * per_mile
+		return m
+
+
+
+	miles={}
+
+	for key, value in coord.iteritems() :
+		src_x = value[0]
+		src_y = value[1]
+		miles[key]=haversine(dest_x, dest_y, src_x, src_y)
+
+
+
+	best_value = min(miles.itervalues()) #extracting 2 best values
+	best_ip = [key for key, value in miles.iteritems() if value == best_value]
+	del miles[best_ip[0]]
+	best_value = min(miles.itervalues())
+	best_ip_1 = [key for key, value in miles.iteritems() if value == best_value]
+	return (best_ip[0], best_ip_1[0])
+
+def latency_check(best_ip, q) :			#multithreaded socket for active measurements
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server_address = ( best_ip , 65501)
+	message = recv_ip[0]
+	sock.connect(server_address)
+	sent = sock.sendall(message)
+	value = sock.recv(2054)
+	latency[best_ip] = float(value)
+	q.put((latency,'done'))
+	sock.close()
+
+
+
+def bestip(latency, recv_ip):			#extracting the best value
+	best_value = min(latency.itervalues())
+	best_ip = [key for key, value in latency.iteritems() if value == best_value]
+	ip[recv_ip] = best_ip[0]
+	return best_ip[0]
+	
+
+src = ip_src()
+port_number = int(sys.argv[2])
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind((src, port_number))
+
+start = time.time()
+end = 0
+while True:
+	if end - start >= 3000 :  #refreashing cache for every 60 secs
+		print(ip)
+		print(end - start)
+		ip = {}
+		start = time.time()
+	latency = {}
+	q = queue.Queue()			#creating a queue for thread
+	data = s.recvfrom(2048)
+	q_data, header,recv_ip, name = unpack_dns(data)
+	if recv_ip[0] in ip :
+		print('cache')
+		send_data = pack_dns(q_data, header, ip[recv_ip[0]])
+		s.sendto(send_data, recv_ip)
+		end = time.time()
+	else : 
+		ip_1, ip_2 = geo_location( recv_ip[0] )
+		for i in ip_1, ip_2 :
+			newthread_1 = threading.Thread(target = latency_check, args = (i, q))
+			newthread_1.start()
+		res_1 = q.get()
+		res_2 = q.get()
+		best_ip = bestip(latency, recv_ip[0])
+		print(recv_ip[0])
+		print(latency, best_ip)
+		if name == d_name :
+			send_data = pack_dns(q_data, header, best_ip)	#sending the best ip
+			s.sendto(send_data, recv_ip)
+		end = time.time()
+

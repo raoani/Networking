@@ -1,0 +1,58 @@
+Team Name : kirik_party
+Team Members : Anirudh Rao, Shreyank Maheshan
+NuID : 001218078, 001234304
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Files Included -
+
+Makefile
+Python Scripts :- rawhttpget
+README
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+How to run the scripts : -
+
+- Run the MAKEFILE for permissions. I have included ethtool commands in the makefile. Please do install ethtool and RUN the makefile.
+- Run the program as ./rawhttpget <url>.
+- I executed the scripts in 3 different computers. It worked in 2 after adding the ethernet header but did not work in one system. Please try the script in another computer, if it does not work.
+- Tested the scripts in ubuntu 12.04.05. 
+- We have implemented the ethernet header for extra credit. The script works fine when the systems connection is NATed in VMs but does not work when the connection is bridged.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Project 4 - Raw Sockets
+
+
+- Aim of the project is to build IP header and TCP header for each packet appending this with HTTP data, properly managing sequence numbers and acknowledgment, perform retransmissions if necessary and verify checksum for each packet. 
+We have executed the script in python 2 and ubuntu 12.04. 
+We have also built ethernet header, performed MAC resolution and implemented Timeouts. We have also implemented a congestion window which reduces to 1 if there is a packet drop or increases for ever ack upto 1000.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Challenges faced :
+
+- We had to understand how the packets are formed. We understood this by referring the binary tides website. 
+- We then had to understand how TCP handshake works. We then understood how to unpack the required data and implement TCP hand shaking.
+- We faced challenges in acknowledgments. We had to figure out which packets we were supposed to drop and which had to be retransmitted. We thought of retransmitting the lost packets i.e the ones whose checksum failed and retransmit the inordered data. 
+- We had to understand how to perform MAC resolution. We had to first figure out how to send the ARP request and understand the ARP reply to extract the GATEWAY MAC address. 
+- We faced a major challenge in 50MB file, i.e. it was taking too long to download and we observerd that retransmission of ACK for inordered data reduced the time it took to download.  
+- We faced another major challenge of handling FIN packets. We discovered FIN would be enabled with psh flag had to extract that data as well.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Roles : 
+
+Anirudh Rao
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+- Wrote the python script to perform handshaking. Unpacking of TCP and packing of TCP header.
+- Wrote the script that packs the packet with the ethernet frame.
+- Wrote the script to handle time outs and retransmissions.
+- Wrote the program to handle ARP request and reply. Extracted the MAC address.
+
+
+Shreyank Maheshan
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+- Wrote the script for IP packing and unpacking during which I had to understand about the format and length of IP packets.
+- Wrote the script to pack ethernet header. 
+- Wrote the script to handle finishing of the communication where I learnt how FIN works and what has to be sent to gracefully close the socket.  

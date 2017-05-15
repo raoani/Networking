@@ -1,0 +1,90 @@
+Team Name: kirik_party.
+Team Members: Anirudh Rao, Shreyank Jolakula Maheshan.
+NUID: 001218078, 001234304.
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+Files Included:
+
+-Makefile -dnsserver -httpserver -deployCDN -runCDN -stopCDN -scamp
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Project 5 - Roll out your own CDN
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+CDN is a delivery network where the content (HTML page) is delivered to a client by a HTTP server depending on the Network parameters.
+We have used AWS EC2 instances to host our HTTP servers and CCIS server. We have implemented both active measurement and GEO-location as our DNS selection stratergy. 
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+Report 
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+DNS Server
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+-We have implemented our DNS server using python. In our DNS server, we decided to go with both active measurement as well as GEO-based IP selection. 
+-We used scamper to perform active mesurements. 
+-We have written a program that waits for a http connection at port 65531. We initally thought of using UDP to send the CLIENT IP receieved at the DNS server, to the HTTP server.
+-We were not able to used UDP socket and thus we had to implement TCP connection which increased our delay. 
+
+-We had initially implemented just active measurements. We observed that just, using a 'for' loop to measure latency value for all the servers took a lot of time.
+-We then used threading to implement active measurements, we still faced significant delay and thus we implemented a combination of geo and Active measurement.
+-Our Geo-location returns us 2 closest servers and then we do active measurements to only those 2 IPS.
+-We have used a dictionary to cache the files. We have written a code such that cache is cleared for every 45 secs so as to keep the active mesaurements up-to-date. 
+
+
+-We initally tested it on our local machine and then we tested this on the CCIS server.
+-We tested the effectiveness of our program by using the DIG command and checking the query time field for every DNS request. We discovered that Geo-location based routing has least latency. 
+-We ressearched about Geo-location and found it to be least efficient and thus we implemented a combination both of to reduce the latency. 
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+HTTP server
+
+---------------------------------------------------------------------------------------------------------------------------------------
+-In the HTTP server we have used SQL lite3 to implement caching.  
+-The strategy we used for caching is, we keep a count of how many times the clients have requested the particular page and we are removing the least frequently called pages i.e zipf distribution.
+-We have also used another program that communicates with DNS to perform active measurements. (scamp)
+-We have used requests library to redirect clients requests to the replica server and then push the page onto a database.
+
+-We used Sqllite3 because it is faster than downloading and storing the file or storing it in a dictionatry. 
+-We have used path ans the index and the full page as the value for sqllite3.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+Challenges faced 
+---------------------
+
+- We had to understand how the HTTP server works. We understood that our requests had to be redirected to the origin server.
+- We then had to understand how to send the requests back to the host.
+- We learnt about sqlite3.
+- Challenge we faced was in the DNS serer, we had to initially understand how the DNS packets are formed. We used wireshark to understand about it.
+- We faced another challenge, we couldnt understand how to respond to the packet. We read a few articles and figured out how to respond. 
+- we had to understand about active measurements.
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+Performance enhancements 
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+-We could have implemented complete active measurements, we could not understand how to reduce the latency. We probably could have made our program more efficient by exiting as soon as we get the least latenccy value. We could have implemented better caching startegies instead of using Dictionary. 
+-We could have worked around the socket creation issue to run the scamper faster. We could have also implemented load balancing i.e. keeping a count of how many IPs are using the particular server.
+-We could use better strategies for implementing HTTP caching, sorted the data according to a particular location or understand how the clients request at a particular area.
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Anirudh Rao
+
+- I worked on HTTPserver caching and DNS server. 
+- I had to understand how to respond for the DNS query and how to answer the query. 
+- I had to understand how sqlite3 works.
+
+
+Shreyank Maheshan
+- I worked on building the HTTPserver. 
+- I had to understand how the request from the client works.
+- I had to understand how to redirect it to the origin server and send the response from the server back to the client. 

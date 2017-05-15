@@ -1,0 +1,82 @@
+Team Name: kirik_party.
+Team Members: Anirudh Rao, Shreyank Jolakula Maheshan.
+NUID: 001218078, 001234304.
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+Files Included:
+
+-Makefile, secret_flags, webcrawler, README
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+Project 2 - Web Crawler
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+Web Crawler is a tool which scrapes through a web page, visiting all the links in the web page and the sub links till the links are exhausted. In this case, till the 5 secret_flags are extracted for each student.
+We have written a python script that performs web crawling on a fake social-networking site called fakebook.
+
+Web crawler requires understanding of HTTP requests. A POST request is used to login to our profile in fakebook. Each GET request downloads a new HTML page and each HTML page contains different links which have to be extracted. The extracted links are then further crawled to obtain more links.
+This process is repeated till we get all 5 flags. Fakebook website uses cookie management, we need to understand HTTP cookies to crawl in our profile.
+
+We used the breadth first search(BFS) method to avoid looping of links. The server sends different HTTP status codes; different functions have to be followed for status codes.
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------
+Challenges Faced:
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+- In the previous project, we learnt how to connect to a server using sockets. Using the same knowledge, we were able to connect to a web server at the port number 80(HTTP).
+
+- We had to learn the HTTP headers for GET request and HTTP POST request. The Headers used by them to download the HTML page and POST our login details onto the fakebook website respectively.
+
+- The Fakebook website uses cookie management, we had to understand how cookies work to login to our profile. We faced difficulties in POSTING the login details as HTTP POST message follows strict Header format. After POSTING we had to extract a new session ID and it had to be passed with every get request.
+
+- After getting the data of the first page, we had to learn how to extract URLs from the page and discard other data. We used the HTML.parser library and urlparse library in python to extract links.
+  We found that each page had few links which were irrelevant to the crawl, we had to discard those links and take only the once which had '/fakebook/' in them.
+
+- Using GET requests, we were able to visit the links. We encountered a HTTP status code of 500, we faced difficulties in working around this condition. We discovered that each time we encounter a 500 error, the connection is closed by the server and we had to create a new socket and reconnect to it.
+We encountered status codes such as 301, we extracted the redirected link. Status code 404 and 403 were managed by just appended the link to a visited link so that the program never visits that link again.
+
+- We discovered that the web pages are looped, we first learned Depth first search method to work around loops. We found out that DFS method took a lot of time so we used Breadth First Search Method instead of DFS.
+We wrote a function that basically performed the function - UNION of 2 sets so as to remove duplicate links.
+
+- Another problem we faced was, the program initially ran for 15-20 mins to extract all the flags. We discovered that storing the data inside a list and checking each data for links, extracting flags and the status codes consumed a lot of time. We used the HTML parser library to extract links and secret flags using their starting TAGS.
+
+- We still had issues because all the links were appended to a single list and each comparison took a lot of time. So we had to learn how to clear the data locally inside the HTML parser class every time a new page is visited, making it easier to compare with the links already visited.
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+Testing the Program:
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+- We initially tested the code till we got the POST message i.e. if we were successfully able to LOGIN or not.
+
+- We then tested if the program managed cookies and was successfully able to Visit links.
+
+- We tested if the web pages were successfully crawled by printing number of pages visited each time. We verified if all the links were unique by installing a library, numpy.
+
+- We then extracted each secret flag and displayed them when they were found.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Roles:
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Anirudh Rao
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Wrote the HTTP POST request. To write the HTTP Post function, I had to first learn about the HTTP header format and to extract cookies from the first GET request. 
+Wrote the function to extract the links from each page and the flags. To do this, I had to learn about tags that were appended to them and extract only the links which were valid for crawling. 
+Wrote the function that performed searching and removing duplicate links using the Breadth first search method. I had to learn how to store the Links, how to remove duplicates and to check if the pages were already visited or not.
+I worked on optimizing the program to achieve better execution time. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+Shreyank Jolakula Maheshan
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Wrote the function to extract status codes from each HTTP response. I had to learn about the HTTP headers and how to extract only the headers from each HTTP response.
+Wrote the function to perform status code handling. I had to learn the consequences of each Status code and provide the exact response to each of them.
+Wrote the function that would download the HTML page using GET request. I had to learn about cookie management to execute this function effectively.
+
+
